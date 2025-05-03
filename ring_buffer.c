@@ -145,7 +145,33 @@ uint16_t ring_buffer_size(const ring_buffer_t *rb)
         return rb->head - rb->tail;
     }
 
-    return rb->size + rb->head - rb->tail;
+    return rb->size - (rb->tail - rb->head);
+}
+
+/**
+ * @brief Get the number of free bytes in the buffer.
+ * @param rb Pointer to ring buffer instance.
+ * @return Number of bytes available to write.
+ */
+uint16_t ring_buffer_free(const ring_buffer_t *rb)
+{
+	uint16_t free = 0;
+
+    if (rb->full)
+    {
+    	free = 0;
+    }
+
+	if (rb->head >= rb->tail)
+	{
+		free = rb->size - (rb->head - rb->tail);
+	}
+	else
+	{
+		free = rb->tail - rb->head;
+	}
+
+    return free;
 }
 
 /**
@@ -272,4 +298,148 @@ uint16_t ring_buffer_read(ring_buffer_t *rb, uint8_t *data, uint16_t length)
     ring_buffer_unlock(rb);
 
     return read;
+}
+
+/**
+ * @brief Get pointer to the start of the linear writable block.
+ *
+ * Returns a direct pointer to the current head of the buffer where data can be
+ * written without wrapping. Used for DMA or block memcpy operations.
+ *
+ * @param rb Pointer to ring buffer.
+ * @return Pointer to the writable block or NULL if buffer is full.
+ */
+uint8_t *ring_buffer_get_linear_block_write_address(ring_buffer_t *rb)
+{
+    if ((rb == NULL) || (rb->full))
+    {
+        return NULL;
+    }
+
+    return &rb->buffer[rb->head];
+}
+
+/**
+ * @brief Get pointer to the start of the linear readable block.
+ *
+ * Returns a direct pointer to the current tail of the buffer where data can be
+ * read without wrapping. Useful for DMA or bulk data reads.
+ *
+ * @param rb Pointer to ring buffer.
+ * @return Pointer to the readable block or NULL if buffer is empty.
+ */
+uint8_t *ring_buffer_get_linear_block_read_address(ring_buffer_t *rb)
+{
+    if (rb == NULL || ring_buffer_is_empty(rb))
+    {
+        return NULL;
+    }
+
+    return &rb->buffer[rb->tail];
+}
+
+/**
+ * @brief Get length of the linear writable block.
+ *
+ * Returns the maximum number of bytes that can be written in one go
+ * without wrapping.
+ *
+ * @param rb Pointer to ring buffer.
+ * @return Number of bytes available for linear write.
+ */
+uint16_t ring_buffer_get_linear_block_write_length(const ring_buffer_t *rb)
+{
+    if (rb == NULL || rb->full)
+    {
+        return 0;
+    }
+
+    if (rb->tail > rb->head)
+    {
+        return rb->tail - rb->head;
+    }
+    else
+    {
+        return rb->size - rb->head;
+    }
+}
+
+/**
+ * @brief Get length of the linear readable block.
+ *
+ * Returns the maximum number of bytes that can be read in one go
+ * without wrapping.
+ *
+ * @param rb Pointer to ring buffer.
+ * @return Number of bytes available for linear read.
+ */
+uint16_t ring_buffer_get_linear_block_read_length(const ring_buffer_t *rb)
+{
+    if (rb == NULL || ring_buffer_is_empty(rb))
+    {
+        return 0;
+    }
+
+    if (rb->head > rb->tail)
+    {
+        return rb->head - rb->tail;
+    }
+    else
+    {
+        return rb->size - rb->tail;
+    }
+}
+
+/**
+ * @brief Commit written bytes to the ring buffer (advance head).
+ *
+ * This function must be called after a direct memory or DMA write into
+ * the buffer to update the head pointer accordingly.
+ *
+ * @param rb Pointer to ring buffer.
+ * @param length Number of bytes written.
+ * @return 1 on success, 0 if buffer is full.
+ */
+uint8_t ring_buffer_commit_write(ring_buffer_t *rb, uint16_t length)
+{
+    if ((rb == NULL) || (length > ring_buffer_get_linear_block_write_length(rb)))
+    {
+        return 0;
+    }
+
+    ring_buffer_lock(rb);
+
+    rb->head = (rb->head + length) % rb->size;
+    rb->full = (rb->head == rb->tail);
+
+    ring_buffer_unlock(rb);
+
+    return 1;
+}
+
+/**
+ * @brief Commit read bytes from the ring buffer (advance tail).
+ *
+ * This function must be called after a direct memory or DMA read from
+ * the buffer to update the tail pointer accordingly.
+ *
+ * @param rb Pointer to ring buffer.
+ * @param length Number of bytes read.
+ * @return 1 on success, 0 if buffer is full.
+ */
+uint8_t ring_buffer_commit_read(ring_buffer_t *rb, uint16_t length)
+{
+    if ((rb == NULL) || (length > ring_buffer_get_linear_block_read_length(rb)))
+    {
+        return 0;
+    }
+
+    ring_buffer_lock(rb);
+
+    rb->tail = (rb->tail + length) % rb->size;
+    rb->full = 0;
+
+    ring_buffer_unlock(rb);
+
+    return 1;
 }

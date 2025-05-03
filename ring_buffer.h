@@ -17,6 +17,10 @@ extern "C" {
 #include <stdint.h>
 
 /* Defines/macros ------------------------------------------------------------*/
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
+
 #define RING_BUFFER_MAX_SIZE (256)
 
 /* Types ---------------------------------------------------------------------*/
@@ -51,11 +55,18 @@ uint8_t ring_buffer_is_empty(const ring_buffer_t *rb);
 uint8_t ring_buffer_is_full(const ring_buffer_t *rb);
 uint16_t ring_buffer_capacity(const ring_buffer_t *rb);
 uint16_t ring_buffer_size(const ring_buffer_t *rb);
+uint16_t ring_buffer_free(const ring_buffer_t *rb);
 uint8_t ring_buffer_put(ring_buffer_t *rb, uint8_t data);
 uint8_t ring_buffer_get(ring_buffer_t *rb, uint8_t *data);
 uint8_t ring_buffer_peek(const ring_buffer_t *rb, uint8_t *data);
 uint16_t ring_buffer_write(ring_buffer_t *rb, const uint8_t *data, uint16_t length);
 uint16_t ring_buffer_read(ring_buffer_t *rb, uint8_t *data, uint16_t length);
+uint8_t *ring_buffer_get_linear_block_write_address(ring_buffer_t *rb);
+uint8_t *ring_buffer_get_linear_block_read_address(ring_buffer_t *rb);
+uint16_t ring_buffer_get_linear_block_write_length(const ring_buffer_t *rb);
+uint16_t ring_buffer_get_linear_block_read_length(const ring_buffer_t *rb);
+uint8_t ring_buffer_commit_read(ring_buffer_t *rb, uint16_t length);
+uint8_t ring_buffer_commit_write(ring_buffer_t *rb, uint16_t length);
 
 #ifdef __cplusplus
 }
